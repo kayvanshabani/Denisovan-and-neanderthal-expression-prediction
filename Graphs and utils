@@ -1,0 +1,305 @@
+### modifies dataset for filtering
+isotrans = fread("isotrans.csv")
+View(isotrans)
+dim(isotrans)
+zeropercent = rowSums(isotrans == 0, na.rm = TRUE)/461
+isotrans[,"zeropercent"] = zeropercent
+setcolorder(isotrans, c("zeropercent", names(isotrans)[1:(length(isotrans)-1)]))
+####
+nonzeromean = rowSums(isotrans[,8:ncol(isotrans)], na.rm = TRUE)/rowSums(isotrans[,8:ncol(isotrans)] != 0, na.rm = TRUE)
+isotrans[,"nonzeromean"] = nonzeromean
+setcolorder(isotrans, c("nonzeromean", names(isotrans)[1:(length(isotrans)-1)]))
+####
+expressionsum = rowSums(isotrans[,9:ncol(isotrans)], na.rm = TRUE)
+isotrans[,"expressionsum"] = expressionsum
+setcolorder(isotrans, c("expressionsum", names(isotrans)[1:(length(isotrans)-1)]))
+####
+NApercent = rowSums(is.na(isotrans[,10:ncol(isotrans)]))/461
+isotrans[,"NApercent"] = NApercent
+setcolorder(isotrans, c("NApercent", names(isotrans)[1:(length(isotrans)-1)]))
+####
+expressionmean = rowMeans(isotrans[, 11:ncol(isotrans)], na.rm = TRUE)
+isotrans[,"expressionmean"] = expressionmean
+setcolorder(isotrans, c("expressionmean", names(isotrans)[1:(length(isotrans)-1)]))
+####
+expressionvar = rowVars(as.matrix(isotrans[,12:ncol(isotrans)]), na.rm = TRUE)
+isotrans[,"expressionvar"] = expressionvar
+setcolorder(isotrans, c("expressionvar", names(isotrans)[1:(length(isotrans)-1)]))
+
+#################
+
+ggplot(isotrans, aes(y = isotrans$expressionmean)) + geom_boxplot()
+ggplot(isosamp, aes(x = isosamp$expressionmean)) + geom_histogram(binwidth = 0.25)
+
+library(readr) 
+library(DataCombine)
+library(ggplot2) 
+library(ggthemes)
+library(matrixStats)
+library(dplyr)
+library(broom)
+library(varhandle)
+library(vcfR)
+library(data.table)
+library(PopGenome)
+library(plotly)
+library(gapminder)
+library(reshape2)
+library(readxl)
+library(data.table)
+setwd("Documents/educational/DL-transcriptomics/")
+description = readxl::read_xlsx("TABLE_1-Samples_Full_Info.xlsx", sheet = 2)
+View(description)
+countries = unique(description[,3])
+countriescount = list()
+
+for (i in c(1: nrow(countries))){
+  countriescount[i] = count(filter(description, description["Population"] == as.character(countries[i,])))
+  #print(str(countries[i,]))
+}
+transpose(countriescount)
+data <- data.frame(
+  country=countries,
+  samplesize=transpose(countriescount)
+)
+View(data)
+names(data) = c("country", "samplesize")
+write.csv(data, "population.csv")
+View(data)
+pie(data$samplesize, labels = data$country)
+ggplot(data, aes(x="", y=samplesize, fill=country)) +
+  geom_bar(stat="identity", width=1, color = "white") +
+  geom_text(aes(label = paste(country, ': ', samplesize)), 
+            position = position_stack(vjust = 0.5)) +  
+  coord_polar("y", start=0) +
+  theme_void()
+
+#############
+
+expression = read.csv("gene_expression (1).csv")
+rm(expression)
+length(colnames(expression))
+samples = colnames(expression)[6:length(colnames(expression))]
+substr(samples, 1, 7)
+
+################
+
+genes = list()
+j = 0
+for (i in c(1:nrow(expression))){
+  if (sum(expression[i, 6:ncol(expression)]) != 0){
+    j = j + 1
+    genes[j] =expression[i, 5] 
+  }
+}
+j
+length(genes)
+print("yes")
+
+k = 0
+zeros = c(6:ncol(expression))*0
+for (i in c(1:nrow(expression))){
+  print(i)
+  if (all(expression[10, 6:ncol(expression)] == zeros) != TRUE){
+    k = k + 1
+    genes[k] =expression[i, 5] 
+  }
+}
+k
+##k = 58001 so we output all genes
+View(expression[,5])
+View(expression)
+write.csv(expression[,5], "geneswithexp.csv")
+##############
+
+x = description
+x["new"] = c(1:2504)
+View(x)
+group_map(group_by(x, Population), ~sum(.$new))
+sum(filter(x, Population == "GBR")[,"new"])
+unique(x$Population)[order(unique(x$Population))]
+countmutframe = data.frame(
+  country = unique(x$Population)[order(unique(x$Population))],
+  mutes = transpose(group_map(group_by(x, Population), ~sum(.$new)))
+  
+)
+View(countmutframe)
+
+sum(countmutframe[,2])
+
+################
+info15 = read.csv("info15.csv")
+View(info15)
+p = ggplot(info15, aes(x = ID, y = countmut)) + geom_bar(stat = "identity")+
+  theme(axis.text.x=element_blank(), axis.ticks.x=element_blank())
+ggplotly(p)
+write.s
+##############
+polysample = info15$ID
+expsample = substr(colnames(expression)[6:ncol(expression)], 1, 7)
+sampinter = intersect(polysample, expsample)
+sampdif = c(setdiff(polysample, expsample), setdiff(expsample, polysample))
+write.csv(sampinter, "expressionandpoly.csv")
+write.csv(sampdif, "notinboth.csv")
+##############
+df = data.frame(
+  labels = colnames(expression)[6:ncol(expression)],
+  maxim = sapply(expression[,6:ncol(expression)], max),
+  minim = sapply(expression[,6:ncol(expression)], min)
+)
+View(df)
+df2 = melt(df, id.vars = 'labels')
+#df2["gene"] = "a"
+View(df2)
+x = expression[which.max(expression[,as.character(df2[1, "labels"])]), 5]
+x
+for(i in c(1:nrow(df2))){
+  if(df2[i, "variable"] == "maxim"){
+    df2[i, "gene"] = expression[which.max(expression[,as.character(df2[i, "labels"])]), 5]
+    #print(expression[which.max(expression[,as.character(df2[i, "labels"])]), 5])
+  }
+  else{
+    df2[i, "gene"] = expression[which.min(expression[,as.character(df2[i, "labels"])]), 5]
+  }
+}
+
+p = ggplot(df2, aes(x = labels, y = value, fill = variable))+
+  geom_bar(stat = "identity", position = "dodge") + 
+  geom_text(aes(x = labels, y = value, label = gene))+
+  labs(x = "samples")+
+  theme(axis.text.x = element_text(angle = 90, hjust = 1))
+
+ggplotly(p)
+
+############
+
+countmutframe = data.frame(
+  country = unique(info15$Population)[order(unique(info15$Population))],
+  mutes = transpose(group_map(group_by(info15, Population), ~sum(.$countmut))),
+  population = data$samplesize[order(data$country)],
+  averagemutation = countmutframe$mutationcount/countmutframe$countrypopulation
+)
+names(countmutframe) = c("country", "mutationcount",
+                         "countrypopulation", "averagemutation")
+View(countmutframe)
+write.csv(countmutframe, "countmutecountry.csv")
+
+###########
+#expression['zeropercent'] = rowSums(expression == 0)/462
+expression = fread("gene_expression (1).csv")
+zeropercent = rowSums(expression == 0)/462
+expression[,zeropercent:=zeropercent]                 
+setcolorder(expression, c("zeropercent", names(expression)[1:(length(expression)-1)]))
+#####
+nonzeromean = rowSums(expression[,7:ncol(expression)])/rowSums(expression != 0)
+expression[,nonzeromean:=nonzeromean]
+setcolorder(expression, c("nonzeromean", names(expression)[1:(length(expression)-1)]))
+#####
+expressionsum = rowSums(expression[,8:ncol(expression)])
+expression[,expressionsum:=expressionsum]
+setcolorder(expression, c("expressionsum", names(expression)[1:(length(expression)-1)]))
+View(expression)
+#####
+expressionmean = rowMeans(expression[, 9:ncol(expression)])
+expression[,expressionmean:=expressionmean]
+setcolorder(expression, c("expressionmean", names(expression)[1:(length(expression)-1)]))
+#####
+expressionvar = rowVars(as.matrix(expression[,10:ncol(expression)]))
+expression[,expressionvar:=expressionvar]
+setcolorder(expression, c("expressionvar", names(expression)[1:(length(expression)-1)]))
+#####
+fwrite(newexpression, "modified_expression.csv")
+newexpression = fread("modified_expression.csv")
+codinggenes = read_excel("Genes.xlsx")
+View(nrow(codinggenes))
+codings = intersect(codinggenes$Gene_Symbol,newexpression$gene_short_name)
+length(codings)
+codingstatusp = c(rep("coding", nrow(filter(newexpression, gene_short_name %in% codings))))
+codingstatusn = c(rep("noncoding", nrow(newexpression)))
+newexpression[, codingstatus:=codingstatusn]
+setcolorder(newexpression, c("codingstatus", names(newexpression)[1:(length(newexpression)-1)]))
+View(newexpression)
+newexpression[1,1] = "noncoding"
+filter(newexpression, gene_short_name %in% codings)$codingstatus
+newexpression[gene_short_name %in% codings,"codingstatus"] = "coding"
+View(filter(newexpression, codingstatus == "coding"))
+########
+sampwithgene = intersect(substr(colnames(newexpression)[12:ncol(newexpression)], 1, 7), description$ID)
+setdiff(substr(colnames(newexpression)[12:ncol(newexpression)], 1, 7), description$ID)
+ncol(newexpression)
+InsertRow(newexpression, rep(1,473))
+rbindlist(list(newexpression, newexpression[1,]), fill = TRUE)
+View(newexpression)
+unique(colnames(newexpression))
+View(sampwithgene)
+########
+description = data.table(description)
+View(count(group_by(description[ID %in% sampwithgene,], Population)))
+nrow(filter(newexpression, zeropercent > 0.9))
+
+work = read.csv("Project Control/workratio.csv")
+work = work[1:32,]
+work[,1] = as.numeric(work[,1])
+dim(work)
+work[1]
+as.numeric(work)
+for (i in c(1:nrow(work))) {
+  
+  work[i,1] = work[i,1]/1980
+}
+View(work)
+a = c(40.00,
+      247.00,
+      3.00,
+      1.00,
+      1.00,
+      2.00,
+      2.00,
+      5.00,
+      43.00,
+      24.00,
+      88.00,
+      90.00,
+      68.00,
+      88.00,
+      90.00,
+      68.00,
+      88.00,
+      90.00,
+      43.00,
+      24.00,
+      88.00,
+      90.00,
+      68.00,
+      88.00,
+      90.00,
+      68.00,
+      88.00,
+      90.00,
+      40.00,
+      5.00,
+      40.00,
+      120.00
+)
+
+dats = data.frame(
+  n1 = c(1:3),
+  n2 = c(1:3),
+  n3 = c(2,2,2),
+  n4 = c(3,3,3)
+)
+rowSums(dats == 2 || dats == 1)
+dats[1, which(dats[2,]==1)]
+?select()
+apply(dats, 2, )
+View(dats)
+
+
+View(a/1980)
+
+guide = fread("guide.csv")
+guide = guide[30:50,]
+View(guide)
+x = c(1,2,4)
+scale(x)
+View(guide[guide$type00<50,])
