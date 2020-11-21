@@ -1,3 +1,4 @@
+#####Creating plink files to run faster by choosing proper range
 for (i in c(22:1)) {
   if(!dir.exists(paste("plinks/plink_", i, sep = "")))
     dir.create(paste("plinks/plink_", i, sep = ""))
@@ -6,7 +7,7 @@ for (i in c(22:1)) {
   system(argplink , ignore.stdout=T,ignore.stderr=T)
 }
 
-
+#####filterng and training
 
 fs = fread("finalselected")
 View(fs)
